@@ -30,8 +30,8 @@ class _ConnectToServerSheetState extends State<ConnectToServerSheet> {
     var previousURL = await Config().getServerURL();
     var previousPhoneIndex = await Config().getPhoneIndex();
     setState(() {
-      _url = previousURL ?? _url;
-      _phoneIndex = previousPhoneIndex ?? _phoneIndex;
+      _url = previousURL ?? "";
+      _phoneIndex = previousPhoneIndex ?? 0;
       _urlController = TextEditingController(text: _url);
       _phoneIndexController = TextEditingController(text: _phoneIndex.toString());
       _configLoaded = true;

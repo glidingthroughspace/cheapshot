@@ -1,8 +1,10 @@
 import 'package:cheapshot/client/config.dart';
 import 'package:http/http.dart' as http;
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 class APIClient {
   var config = Config();
+  WebSocketChannel? _channel;
 
   Future<bool> serverIsReachable() async {
     if (await config.getServerURL() == null) {
@@ -16,6 +18,25 @@ class APIClient {
       return false;
     }
     return true;
+  }
+
+  Future<void> connectToServer(int phoneIndex) async {
+    var serverURL = await config.getServerURL();
+    if (serverURL == null) {
+      throw Exception("Server URL not set");
+    }
+    var uri = Uri.parse("ws://$serverURL/phones/$phoneIndex");
+    print("Connecting websocket to $uri");
+    _channel = WebSocketChannel.connect(uri);
+    _channel?.stream.listen((event) {
+      print(event);
+    });
+    return _channel?.ready.timeout(const Duration(seconds: 3));
+  }
+
+  void disconnectFromServer() {
+    print("Disconnecting websocket");
+    _channel?.sink.close();
   }
 
   Future<Uri> buildURI(String path, Map<String, String>? query) async {

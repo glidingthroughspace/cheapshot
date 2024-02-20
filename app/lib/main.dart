@@ -46,8 +46,9 @@ class CheapShotHome extends StatefulWidget {
 class CheapShotHomeState extends State<CheapShotHome> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
-  bool _connectedToServer = false;
+  String _connectionStatus = "Disconnected";
   int? _phoneIndex;
+  final APIClient _apiClient = APIClient();
 
   @override
   void initState() {
@@ -68,9 +69,11 @@ class CheapShotHomeState extends State<CheapShotHome> {
   }
 
   Future<void> checkServerConnection() async {
-    var reachable = await APIClient().serverIsReachable();
+    var reachable = await _apiClient.serverIsReachable();
     setState(() {
-      _connectedToServer = reachable;
+      if (reachable) {
+        _connectionStatus = "Server reachable";
+      }
     });
   }
 
@@ -79,6 +82,7 @@ class CheapShotHomeState extends State<CheapShotHome> {
     // Dispose of the controller when the widget is disposed.
     _controller.dispose();
     super.dispose();
+    _apiClient.disconnectFromServer();
   }
 
   @override
@@ -110,8 +114,14 @@ class CheapShotHomeState extends State<CheapShotHome> {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text(_connectedToServer ? "Connected" : "Disconnected",
-                          style: TextStyle(color: _connectedToServer ? Colors.lightGreen : Colors.red, fontSize: 20.0)),
+                      Text(_connectionStatus,
+                          style: TextStyle(
+                              color: _connectionStatus == "Connected"
+                                  ? Colors.lightGreen
+                                  : _connectionStatus == "Server reachable"
+                                      ? Colors.yellow
+                                      : Colors.red,
+                              fontSize: 20.0)),
                       Text(_phoneIndex != null ? "Phone #$_phoneIndex" : "Phone # not set",
                           style: TextStyle(
                               color: ThemeData.dark(useMaterial3: true).textTheme.bodyMedium?.color, fontSize: 20.0))
@@ -133,7 +143,7 @@ class CheapShotHomeState extends State<CheapShotHome> {
             }
           },
         ),
-        floatingActionButton: _connectedToServer
+        floatingActionButton: _connectionStatus == "Connected"
             ? FloatingActionButton(
                 // Provide an onPressed callback.
                 onPressed: () async {
@@ -178,9 +188,15 @@ class CheapShotHomeState extends State<CheapShotHome> {
                   var phoneIndex = await Config().getPhoneIndex();
                   if (result == "connected") {
                     setState(() {
-                      _connectedToServer = true;
+                      _connectionStatus = "Connected";
                       _phoneIndex = phoneIndex;
                     });
+                    if (phoneIndex != null) {
+                      print("Connecting to websocket server");
+                      await _apiClient.connectToServer(phoneIndex);
+                    } else {
+                      print("Phone index is null, not connecting");
+                    }
                   } else {
                     print("Result of the connect to server sheet: $result");
                   }
