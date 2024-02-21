@@ -65,7 +65,7 @@ lib/generated_plugin_registrant.dart
 *.dll
 *.so
 *.dylib
-./server/cheapshot
+server/cheapshot
 
 # Test binary, built with `go test -c`
 *.test
