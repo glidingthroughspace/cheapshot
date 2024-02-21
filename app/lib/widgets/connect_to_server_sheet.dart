@@ -2,6 +2,7 @@ import 'package:cheapshot/client/api_client.dart';
 import 'package:cheapshot/client/config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:logging/logging.dart';
 
 class ConnectToServerSheet extends StatefulWidget {
   const ConnectToServerSheet({super.key});
@@ -10,6 +11,8 @@ class ConnectToServerSheet extends StatefulWidget {
   State<ConnectToServerSheet> createState() => _ConnectToServerSheetState();
 }
 
+enum ConnectToServerSheetResult { connected, error }
+
 class _ConnectToServerSheetState extends State<ConnectToServerSheet> {
   late bool _connecting;
   late String _url;
@@ -17,10 +20,10 @@ class _ConnectToServerSheetState extends State<ConnectToServerSheet> {
   bool _configLoaded = false;
   late TextEditingController _urlController;
   late TextEditingController _phoneIndexController;
+  final log = Logger("ConnectToServerSheetState");
 
   @override
   void initState() {
-    print("Init state called");
     super.initState();
     _connecting = false;
     loadConfig();
@@ -45,13 +48,13 @@ class _ConnectToServerSheetState extends State<ConnectToServerSheet> {
     Config config = Config();
     config.setServerURL(_url);
     config.setPhoneIndex(_phoneIndex);
-    print("Setting server URL to $_url");
-    print("Testing reachability");
+    log.config("Setting server URL to $_url");
+    log.config("Testing reachability");
     var reachable = await APIClient().serverIsReachable();
-    print(reachable ? "Server is reachable" : "Server is not reachable");
+    log.info(reachable ? "Server is reachable" : "Server is not reachable");
     if (reachable) {
       if (!mounted) return;
-      Navigator.pop(context, 'connected');
+      Navigator.pop(context, ConnectToServerSheetResult.connected);
     } else {
       setState(() {
         _connecting = false;

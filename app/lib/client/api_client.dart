@@ -1,46 +1,80 @@
 import 'package:cheapshot/client/config.dart';
 import 'package:http/http.dart' as http;
+import 'package:logging/logging.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 class APIClient {
-  var config = Config();
+  final _config = Config();
   WebSocketChannel? _channel;
+  final log = Logger("APIClient");
+  final _onTakePictureEventListeners = <Function>[];
 
   Future<bool> serverIsReachable() async {
-    if (await config.getServerURL() == null) {
+    if (await _config.getServerURL() == null) {
       return false;
     }
 
     try {
       await get("/health").timeout(const Duration(seconds: 2));
     } catch (err) {
-      print(err);
+      log.severe("Server's health endpoint not reachable", err);
       return false;
     }
     return true;
   }
 
   Future<void> connectToServer(int phoneIndex) async {
-    var serverURL = await config.getServerURL();
+    var serverURL = await _config.getServerURL();
     if (serverURL == null) {
       throw Exception("Server URL not set");
     }
     var uri = Uri.parse("ws://$serverURL/phones/$phoneIndex");
-    print("Connecting websocket to $uri");
+    log.info("Connecting websocket to $uri");
     _channel = WebSocketChannel.connect(uri);
     _channel?.stream.listen((event) {
-      print(event);
+      if (event is String) {
+        if (event == "take_picture") {
+          log.info("Received event 'take_picture' from server");
+          for (var f in _onTakePictureEventListeners) {
+            f();
+          }
+        }
+      }
+      log.info("WebSocket message from server: $event");
     });
     return _channel?.ready.timeout(const Duration(seconds: 3));
   }
 
+  Future<void> uploadPhoto(String path) async {
+    final serverURL = await _config.getServerURL();
+    if (serverURL == null) {
+      throw Exception("Server URL not set");
+    }
+    final phoneIndex = await _config.getPhoneIndex();
+    if (phoneIndex == null) {
+      throw Exception("Phone index not set");
+    }
+    final uri = Uri.parse("http://$serverURL/phones/$phoneIndex/photos");
+    var request = http.MultipartRequest("POST", uri);
+    request.files.add(await http.MultipartFile.fromPath("photo", path));
+    var response = await request.send();
+    if (response.statusCode != 200) {
+      throw Exception("Failed to upload photo: ${response.statusCode}");
+    }
+    log.info("Uploaded photo");
+  }
+
+  void onTakePictureEvent(Function f) {
+    _onTakePictureEventListeners.add(f);
+  }
+
   void disconnectFromServer() {
-    print("Disconnecting websocket");
+    log.info("Disconnecting WebSocket");
     _channel?.sink.close();
   }
 
   Future<Uri> buildURI(String path, Map<String, String>? query) async {
-    var serverUrl = await config.getServerURL();
+    var serverUrl = await _config.getServerURL();
     if (serverUrl == null) {
       throw Exception("Server URL not set");
     }
