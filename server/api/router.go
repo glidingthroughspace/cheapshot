@@ -15,6 +15,7 @@ func Run(host string, port int, hub *messaging.Hub) error {
 	mux := http.NewServeMux()
 	mux.Handle("/health", LogRequest(handler.Health))
 	mux.Handle("/phones/{index}", LogRequest(handler.RegisterPhone(hub)))
+	mux.Handle("POST /phones/{index}/photos", LogRequest(handler.UploadPhoto))
 	mux.Handle("POST /debug/broadcast", LogRequest(handler.DebugBroadcast(hub)))
 
 	srv = &http.Server{
