@@ -6,6 +6,7 @@ import 'package:cheapshot/client/api_client.dart';
 import 'package:cheapshot/client/config.dart';
 import 'package:cheapshot/connection_status.dart';
 import 'package:cheapshot/widgets/connect_to_server_sheet.dart';
+import 'package:cheapshot/widgets/header_status_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:logging/logging.dart';
@@ -147,45 +148,24 @@ class CheapShotHomeState extends State<CheapShotHome> {
   Widget build(BuildContext context) {
     return Scaffold(
         appBar: AppBar(
-          title: const Text('CheapShot'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.settings),
-              onPressed: () async {
-                await showModalBottomSheet(
-                  context: context,
-                  builder: (BuildContext context) => const ConnectToServerSheet(),
-                  isDismissible: true,
-                );
-                var phoneIndex = await Config().getPhoneIndex();
-                setState(() {
-                  _phoneIndex = phoneIndex;
-                });
-              },
-            )
-          ],
-          bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(52.0),
-              child: SizedBox(
-                  height: 52.0,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(_connectionStatus.name,
-                          style: TextStyle(
-                              color: _connectionStatus == ConnectionStatus.connected
-                                  ? Colors.lightGreen
-                                  : _connectionStatus == ConnectionStatus.reachable
-                                      ? Colors.yellow
-                                      : Colors.red,
-                              fontSize: 20.0)),
-                      Text(_phoneIndex != null ? "Phone #$_phoneIndex" : "Phone # not set",
-                          style: TextStyle(
-                              color: ThemeData.dark(useMaterial3: true).textTheme.bodyMedium?.color, fontSize: 20.0))
-                    ],
-                  ))),
-        ),
+            title: const Text('CheapShot'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.settings),
+                onPressed: () async {
+                  var result = await showModalBottomSheet(
+                    context: context,
+                    builder: (BuildContext context) => const ConnectToServerSheet(),
+                    isDismissible: true,
+                  );
+                  handleConnectModalClosure(result);
+                },
+              )
+            ],
+            bottom: HeaderStatusBar(
+              connectionStatus: _connectionStatus,
+              phoneIndex: _phoneIndex,
+            )),
         // You must wait until the controller is initialized before displaying the
         // camera preview. Use a FutureBuilder to display a loading spinner until the
         // controller has finished initializing.
