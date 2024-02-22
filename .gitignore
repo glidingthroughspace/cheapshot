@@ -191,3 +191,4 @@ $RECYCLE.BIN/
 
 # Uploaded image files
 server/uploads
+*.mp4
