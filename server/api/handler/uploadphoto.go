@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 )
 
 const megabyte = 1 << 20
@@ -27,8 +28,11 @@ func UploadPhoto(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
+	snapshotID := header.Filename
+	targetFileName := phoneIndex + ".jpg"
+
 	// Create a new file in the uploads directory
-	dst, err := os.Create("./uploads/" + header.Filename)
+	dst, err := os.Create(filepath.Join("./uploads", snapshotID, targetFileName))
 	if err != nil {
 		slog.Error("Couldn't create file", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -41,6 +45,6 @@ func UploadPhoto(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	slog.Info("File uploaded successfully", "filename", header.Filename, "size", header.Size)
+	slog.Info("File uploaded successfully", "snapshotId", header.Filename, "size", header.Size)
 	w.Write([]byte("OK"))
 }
