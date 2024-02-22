@@ -29,19 +29,19 @@ var (
 
 type Client struct {
 	Hub *Hub
-
 	// The websocket connection.
 	conn *websocket.Conn
-
 	// Buffered channel of outbound messages.
-	send chan []byte
+	send       chan []byte
+	phoneIndex int
 }
 
-func NewClient(hub *Hub, conn *websocket.Conn) *Client {
+func NewClient(hub *Hub, conn *websocket.Conn, phoneIndex int) *Client {
 	return &Client{
-		Hub:  hub,
-		conn: conn,
-		send: make(chan []byte, 256),
+		Hub:        hub,
+		conn:       conn,
+		send:       make(chan []byte, 256),
+		phoneIndex: phoneIndex,
 	}
 }
 
@@ -62,13 +62,14 @@ func (c *Client) ReadPump() {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				slog.Error("Websocket error", "error", err)
+				slog.Error("WebSocket error", "error", err, "phoneIndex", c.phoneIndex)
+			} else {
+				slog.Info("WebSocket disconnected", "phoneIndex", c.phoneIndex)
 			}
 			break
 		}
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
-		slog.Debug("Received message", "message", string(message))
-		c.Hub.broadcast <- message
+		slog.Debug("Received message", "message", string(message), "phoneIndex", c.phoneIndex)
 	}
 }
 

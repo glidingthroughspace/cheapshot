@@ -62,5 +62,6 @@ func (h *Hub) Run(ctx context.Context) {
 }
 
 func (h *Hub) BroadcastBytes(message []byte) {
+	slog.Info("Broadcasting message", "message", string(message))
 	h.broadcast <- message
 }
