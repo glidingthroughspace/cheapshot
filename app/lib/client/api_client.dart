@@ -1,13 +1,14 @@
 import 'package:cheapshot/client/config.dart';
 import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
+import 'package:web_socket_channel/status.dart' as status;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 class APIClient {
   final _config = Config();
   WebSocketChannel? _channel;
   final log = Logger("APIClient");
-  final _onTakePictureEventListeners = <Function>[];
+  final _onTakePictureEventListeners = <Function(String snapshotId)>[];
 
   Future<bool> serverIsReachable() async {
     if (await _config.getServerURL() == null) {
@@ -33,10 +34,11 @@ class APIClient {
     _channel = WebSocketChannel.connect(uri);
     _channel?.stream.listen((event) {
       if (event is String) {
-        if (event == "take_picture") {
+        if (event.startsWith("take_photo")) {
           log.info("Received event 'take_picture' from server");
+          final snapshotId = event.split("|")[1];
           for (var f in _onTakePictureEventListeners) {
-            f();
+            f(snapshotId);
           }
         }
       }
@@ -45,7 +47,7 @@ class APIClient {
     return _channel?.ready.timeout(const Duration(seconds: 3));
   }
 
-  Future<void> uploadPhoto(String path) async {
+  Future<void> uploadPhoto(String path, String snapshotId) async {
     final serverURL = await _config.getServerURL();
     if (serverURL == null) {
       throw Exception("Server URL not set");
@@ -56,7 +58,7 @@ class APIClient {
     }
     final uri = Uri.parse("http://$serverURL/phones/$phoneIndex/photos");
     var request = http.MultipartRequest("POST", uri);
-    request.files.add(await http.MultipartFile.fromPath("photo", path));
+    request.files.add(await http.MultipartFile.fromPath("photo", path, filename: snapshotId));
     var response = await request.send();
     if (response.statusCode != 200) {
       throw Exception("Failed to upload photo: ${response.statusCode}");
@@ -64,13 +66,13 @@ class APIClient {
     log.info("Uploaded photo");
   }
 
-  void onTakePictureEvent(Function f) {
+  void onTakePictureEvent(Function(String snapshotId) f) {
     _onTakePictureEventListeners.add(f);
   }
 
   void disconnectFromServer() {
     log.info("Disconnecting WebSocket");
-    _channel?.sink.close();
+    _channel?.sink.close(status.goingAway);
   }
 
   Future<Uri> buildURI(String path, Map<String, String>? query) async {

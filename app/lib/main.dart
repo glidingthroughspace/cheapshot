@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:cheapshot/client/api_client.dart';
@@ -72,7 +71,7 @@ class CheapShotHomeState extends State<CheapShotHome> {
       // Get a specific camera from the list of available cameras.
       widget.camera,
       // Define the resolution to use.
-      ResolutionPreset.ultraHigh,
+      ResolutionPreset.max,
       enableAudio: false,
     );
 
@@ -80,7 +79,7 @@ class CheapShotHomeState extends State<CheapShotHome> {
     _initializeControllerFuture = _controller.initialize();
   }
 
-  Future<void> onTakePicture() async {
+  Future<void> onTakePicture(String snapshotId) async {
     log.fine("Trying to take a picture");
     // Take the Picture in a try / catch block. If anything goes wrong,
     // catch the error.
@@ -96,7 +95,7 @@ class CheapShotHomeState extends State<CheapShotHome> {
 
       if (!context.mounted || !mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Uploading photo")));
-      await _apiClient.uploadPhoto(image.path);
+      await _apiClient.uploadPhoto(image.path, snapshotId);
       if (!context.mounted || !mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Photo uploaded")));
     } catch (e) {
@@ -174,7 +173,7 @@ class CheapShotHomeState extends State<CheapShotHome> {
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.done) {
               // If the Future is complete, display the preview.
-              return CameraPreview(_controller);
+              return Center(child: CameraPreview(_controller));
             } else {
               // Otherwise, display a loading indicator.
               return const Center(child: CircularProgressIndicator());
@@ -182,10 +181,16 @@ class CheapShotHomeState extends State<CheapShotHome> {
           },
         ),
         floatingActionButton: _connectionStatus == ConnectionStatus.connected
-            ? FloatingActionButton(
+            ? FloatingActionButton.extended(
                 // Provide an onPressed callback.
-                onPressed: onTakePicture,
-                child: const Icon(Icons.camera_alt),
+                onPressed: () {
+                  _apiClient.disconnectFromServer();
+                  setState(() {
+                    _connectionStatus = ConnectionStatus.disconnected;
+                  });
+                },
+                label: const Text('Disconnect'),
+                icon: const Icon(Icons.link_off),
               )
             : FloatingActionButton.extended(
                 onPressed: () async {
@@ -194,39 +199,26 @@ class CheapShotHomeState extends State<CheapShotHome> {
                     builder: (BuildContext context) => const ConnectToServerSheet(),
                     isDismissible: false,
                   );
-                  if (result == ConnectToServerSheetResult.connected) {
-                    final phoneIndex = await Config().getPhoneIndex();
-                    setState(() {
-                      _connectionStatus = ConnectionStatus.connected;
-                      _phoneIndex = phoneIndex;
-                    });
-                    if (phoneIndex != null) {
-                      await _apiClient.connectToServer(phoneIndex);
-                    } else {
-                      log.warning("Phone index is null, not connecting");
-                    }
-                  } else {
-                    log.warning("Result of the connect to server sheet: $result");
-                  }
+                  await handleConnectModalClosure(result);
                 },
                 label: const Text("Connect"),
                 icon: const Icon(Icons.link)));
   }
-}
 
-// A widget that displays the picture taken by the user.
-class DisplayPictureScreen extends StatelessWidget {
-  final String imagePath;
-
-  const DisplayPictureScreen({super.key, required this.imagePath});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Display the Picture')),
-      // The image is stored as a file on the device. Use the `Image.file`
-      // constructor with the given path to display the image.
-      body: Image.file(File(imagePath)),
-    );
+  Future<void> handleConnectModalClosure(result) async {
+    if (result == ConnectToServerSheetResult.connected) {
+      final phoneIndex = await Config().getPhoneIndex();
+      setState(() {
+        _connectionStatus = ConnectionStatus.connected;
+        _phoneIndex = phoneIndex;
+      });
+      if (phoneIndex != null) {
+        await _apiClient.connectToServer(phoneIndex);
+      } else {
+        log.warning("Phone index is null, not connecting");
+      }
+    } else {
+      log.warning("Result of the connect to server sheet: $result");
+    }
   }
 }
