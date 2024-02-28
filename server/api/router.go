@@ -18,6 +18,7 @@ func Run(host string, port int, hub *messaging.Hub) error {
 	mux.Handle("POST /phones/{index}/photos", LogRequest(handler.UploadPhoto))
 	mux.Handle("POST /trigger", LogRequest(handler.TakePhoto(hub)))
 	mux.Handle("POST /debug/broadcast", LogRequest(handler.DebugBroadcast(hub)))
+	mux.Handle("/", http.FileServer(http.Dir("./pages")))
 
 	srv = &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", host, port),
