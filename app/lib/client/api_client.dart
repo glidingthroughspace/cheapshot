@@ -8,7 +8,9 @@ class APIClient {
   final _config = Config();
   WebSocketChannel? _channel;
   final log = Logger("APIClient");
-  final _onTakePictureEventListeners = <Function(String snapshotId)>[];
+  Function(String snapshotId)? _onTakePictureEventListener;
+  Function? _onStartStreaming;
+  Function? _onStopStreaming;
 
   Future<bool> serverIsReachable() async {
     if (await _config.getServerURL() == null) {
@@ -34,11 +36,19 @@ class APIClient {
     _channel = WebSocketChannel.connect(uri);
     _channel?.stream.listen((event) {
       if (event is String) {
+        log.info("Received event '$event' from server");
         if (event.startsWith("take_photo")) {
-          log.info("Received event 'take_picture' from server");
           final snapshotId = event.split("|")[1];
-          for (var f in _onTakePictureEventListeners) {
-            f(snapshotId);
+          if (_onTakePictureEventListener != null) {
+            _onTakePictureEventListener!(snapshotId);
+          }
+        } else if (event == "start_streaming") {
+          if (_onStartStreaming != null) {
+            _onStartStreaming!();
+          }
+        } else if (event == "stop_streaming") {
+          if (_onStopStreaming != null) {
+            _onStopStreaming!();
           }
         }
       }
@@ -67,7 +77,15 @@ class APIClient {
   }
 
   void onTakePictureEvent(Function(String snapshotId) f) {
-    _onTakePictureEventListeners.add(f);
+    _onTakePictureEventListener = f;
+  }
+
+  void onStartStreaming(Function f) {
+    _onStartStreaming = f;
+  }
+
+  void onStopStreaming(Function f) {
+    _onStopStreaming = f;
   }
 
   void disconnectFromServer() {

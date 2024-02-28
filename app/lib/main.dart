@@ -8,7 +8,9 @@ import 'package:cheapshot/widgets/connect_to_server_sheet.dart';
 import 'package:cheapshot/widgets/header_status_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:logging/logging.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 Future<void> main() async {
   Logger.root.level = Level.ALL;
@@ -19,6 +21,7 @@ Future<void> main() async {
   // Ensure that plugin services are initialized so that `availableCameras()`
   // can be called before `runApp()`
   WidgetsFlutterBinding.ensureInitialized();
+  WakelockPlus.enable();
 
   // Obtain a list of the available cameras on the device.
   final cameras = await availableCameras();
@@ -51,12 +54,13 @@ class CheapShotHome extends StatefulWidget {
 }
 
 class CheapShotHomeState extends State<CheapShotHome> {
+  final log = Logger("CheapShotHomeState");
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
   late ConnectionStatus _connectionStatus;
   int? _phoneIndex;
-  final log = Logger("CheapShotHomeState");
   final APIClient _apiClient = APIClient();
+  RTCPeerConnection? _rtPeerConnection;
 
   @override
   void initState() {
@@ -65,6 +69,8 @@ class CheapShotHomeState extends State<CheapShotHome> {
     checkServerConnection();
     loadPhoneID();
     _apiClient.onTakePictureEvent(onTakePicture);
+    _apiClient.onStartStreaming(onStartStraming);
+    _apiClient.onStopStreaming(onStopStreaming);
     // To display the current output from the Camera,
     // create a CameraController.
     _controller = CameraController(
@@ -79,7 +85,7 @@ class CheapShotHomeState extends State<CheapShotHome> {
     _initializeControllerFuture = _controller.initialize();
   }
 
-  Future<void> onTakePicture(String snapshotId) async {
+  onTakePicture(String snapshotId) async {
     log.fine("Trying to take a picture");
     // Take the Picture in a try / catch block. If anything goes wrong,
     // catch the error.
@@ -104,7 +110,30 @@ class CheapShotHomeState extends State<CheapShotHome> {
     }
   }
 
-  Future<void> checkServerConnection() async {
+  onStartStraming() async {
+    log.fine("Starting WebRTC stream");
+    _rtPeerConnection = await createPeerConnection({
+      'iceServers': []
+    }, {
+      'mandatory': {'OfferToReceiveVideo': true}
+    });
+    MediaStream stream = await navigator.mediaDevices.getUserMedia({
+      'audio': false,
+      'video': {
+        'facingMode': 'away',
+        'width': 640,
+        'height': 480,
+      },
+    });
+    await _rtPeerConnection?.addStream(stream);
+  }
+
+  onStopStreaming() async {
+    log.fine("Stopping WebRTC stream");
+    _rtPeerConnection?.dispose();
+  }
+
+  checkServerConnection() async {
     var reachable = await _apiClient.serverIsReachable();
     setState(() {
       if (reachable) {
@@ -115,7 +144,7 @@ class CheapShotHomeState extends State<CheapShotHome> {
     });
   }
 
-  Future<void> loadPhoneID() async {
+  loadPhoneID() async {
     var phoneIndex = await Config().getPhoneIndex();
     setState(() {
       _phoneIndex = phoneIndex;
@@ -137,10 +166,11 @@ class CheapShotHomeState extends State<CheapShotHome> {
 
   @override
   void dispose() {
+    super.dispose();
     // Dispose of the controller when the widget is disposed.
     _controller.dispose();
-    super.dispose();
     _apiClient.disconnectFromServer();
+    _rtPeerConnection?.dispose();
   }
 
   @override
