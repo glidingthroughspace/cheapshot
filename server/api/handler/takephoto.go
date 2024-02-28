@@ -22,7 +22,7 @@ func TakePhoto(hub *messaging.Hub) http.HandlerFunc {
 		snapshotID := RandStringBytes(snapshotIDLength)
 		os.MkdirAll(filepath.Join("uploads", snapshotID), os.ModePerm)
 		hub.BroadcastBytes([]byte("take_photo|" + snapshotID))
-		w.Write([]byte("OK"))
+		w.Write([]byte(snapshotID))
 	}
 }
 

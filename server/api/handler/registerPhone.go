@@ -2,6 +2,7 @@ package handler
 
 import (
 	"log/slog"
+	"net"
 	"net/http"
 	"strconv"
 
@@ -29,7 +30,8 @@ func RegisterPhone(hub *messaging.Hub) http.HandlerFunc {
 			slog.Error("Failed to upgrade connection", "error", err)
 			return
 		}
-		client := messaging.NewClient(hub, conn, phoneIndex)
+		phoneIP := net.ParseIP(r.RemoteAddr)
+		client := messaging.NewClient(hub, conn, phoneIndex, phoneIP)
 		hub.Register <- client
 
 		// Allow collection of memory referenced by the caller by doing all work in

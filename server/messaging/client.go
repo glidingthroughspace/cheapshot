@@ -3,6 +3,7 @@ package messaging
 import (
 	"bytes"
 	"log/slog"
+	"net"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -34,14 +35,16 @@ type Client struct {
 	// Buffered channel of outbound messages.
 	send       chan []byte
 	phoneIndex int
+	ip         net.IP
 }
 
-func NewClient(hub *Hub, conn *websocket.Conn, phoneIndex int) *Client {
+func NewClient(hub *Hub, conn *websocket.Conn, phoneIndex int, ip net.IP) *Client {
 	return &Client{
 		Hub:        hub,
 		conn:       conn,
 		send:       make(chan []byte, 256),
 		phoneIndex: phoneIndex,
+		ip:         ip,
 	}
 }
 

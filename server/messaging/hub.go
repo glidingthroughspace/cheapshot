@@ -3,6 +3,7 @@ package messaging
 import (
 	"context"
 	"log/slog"
+	"net"
 )
 
 // Hub maintains the set of active clients and broadcasts messages to the
@@ -64,4 +65,26 @@ func (h *Hub) Run(ctx context.Context) {
 func (h *Hub) BroadcastBytes(message []byte) {
 	slog.Info("Broadcasting message", "message", string(message))
 	h.broadcast <- message
+}
+
+// IPOfCenterPhone returns the IP address of the "centermost" phone.
+// If no phone is connected, this returns nil.
+// Phones are expected to start with index 1.
+func (h *Hub) IPOfCenterPhone() net.IP {
+	numClients := len(h.clients)
+	if numClients == 0 {
+		return nil
+	}
+	if numClients == 1 {
+		for client := range h.clients {
+			return client.ip
+		}
+	}
+	for client := range h.clients {
+		if client.phoneIndex == (numClients / 2) {
+			return nil
+		}
+	}
+	slog.Error("No phone with an expected index is connected", "clients", numClients)
+	return nil
 }
