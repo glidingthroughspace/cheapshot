@@ -8,6 +8,7 @@
   </head>
   <body>
     <div id="preview">
+      <video id="previewVideo" autoplay playsinline muted></video>
       <div id="countdown">3</div>
       <div id="previewLoadingIndicator">
         <svg
@@ -46,7 +47,13 @@
         </svg>
       </div>
     </div>
-    <button id="trigger" onclick="trigger()">Go!</button>
-    <script src="/script.js"></script>
+    <aside id="debug">
+      <h1>Debug panel</h1>
+      <button id="debugServerHealth">Test server connection</button>
+      <button id="debugEnablePreview">Get Preview IP</button>
+    </aside>
+    <button id="trigger">Go!</button>
+    <script src="/js/main.js" type="module"></script>
+    <script src="/js/debug.js" type="module"></script>
   </body>
 </html>
