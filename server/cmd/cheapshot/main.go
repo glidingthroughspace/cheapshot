@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os/signal"
 	"syscall"
@@ -17,12 +18,12 @@ func main() {
 
 	hubCtx, stopHub := context.WithCancel(context.Background())
 	hub := messaging.NewHub()
-	host := "0.0.0.0"
+	host := "127.0.0.1"
 	port := 7070
 	// Start all subsystems
 	go api.Run(host, port, hub)
 	go hub.Run(hubCtx)
-	slog.Info("Server started")
+	slog.Info("Server started", "address", fmt.Sprintf("http://%s:%v", host, port))
 	// Wait for a termination signal
 	<-ctx.Done()
 	slog.Info("Shutting down server due to signal")

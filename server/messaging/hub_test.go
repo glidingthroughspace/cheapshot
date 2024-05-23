@@ -1,6 +1,7 @@
 package messaging
 
 import (
+	"context"
 	"net"
 	"testing"
 )
@@ -8,33 +9,46 @@ import (
 func TestHubIPOfCenterPhone(t *testing.T) {
 	type testcase struct {
 		name       string
-		input      map[*Client]bool
+		input      []*Client
 		expectedIP net.IP
 	}
 	tests := []testcase{
 		{
 			name:       "No client connected",
-			input:      make(map[*Client]bool),
+			input:      []*Client{},
 			expectedIP: nil,
 		},
 		{
-			name:       "One client connected",
-			input:      makeClientMap([]*Client{NewClient(nil, nil, 1, net.IP{})}),
-			expectedIP: nil,
+			name:       "One client",
+			input:      []*Client{clientWithIP(1, "127.0.1.1")},
+			expectedIP: net.ParseIP("127.0.1.1"),
+		}, {
+			name:       "Two clients",
+			input:      []*Client{clientWithIP(1, "127.0.1.1"), clientWithIP(2, "127.0.1.2")},
+			expectedIP: net.ParseIP("127.0.1.1"),
+		}, {
+			name:       "Three clients",
+			input:      []*Client{clientWithIP(1, "127.0.1.1"), clientWithIP(2, "127.0.1.2"), clientWithIP(3, "127.0.1.3")},
+			expectedIP: net.ParseIP("127.0.1.2"),
 		},
 	}
 	for _, tc := range tests {
-		t.Run(t.Name(), func(t *testing.T) {
-			hub := ewHub()
-			hub.Register <- tc.input
+		t.Run(tc.name, func(t *testing.T) {
+			hub := NewHub()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			go hub.Run(ctx)
+			for _, c := range tc.input {
+				hub.Register <- c
+			}
+			actualIP := hub.IPOfCenterPhone()
+			if actualIP.String() != tc.expectedIP.String() {
+				t.Errorf("Expected IP %v, got %v", tc.expectedIP, actualIP)
+			}
 		})
 	}
 }
 
-func makeClientMap(cs []*Client) map[*Client]bool {
-	m := make(map[*Client]bool)
-	for _, c := range cs {
-		m[c] = true
-	}
-	return m
+func clientWithIP(idx int, ip string) *Client {
+	return NewClient(nil, nil, idx, net.ParseIP(ip))
 }

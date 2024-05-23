@@ -21,7 +21,14 @@ func TakePhoto(hub *messaging.Hub) http.HandlerFunc {
 		slog.Info("Received request to take photo")
 		snapshotID := RandStringBytes(snapshotIDLength)
 		os.MkdirAll(filepath.Join("uploads", snapshotID), os.ModePerm)
-		hub.BroadcastBytes([]byte("take_photo|" + snapshotID))
+		if hub.HasRequiredNumberOfClients() {
+			hub.BroadcastBytes([]byte("take_photo|" + snapshotID))
+		} else {
+			slog.Error("We don't have the required number of phones connected")
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("Too few phones connected"))
+			return
+		}
 		w.Write([]byte(snapshotID))
 	}
 }

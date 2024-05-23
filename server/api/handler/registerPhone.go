@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/glidingthroughspace/cheapshot/messaging"
 	"github.com/gorilla/websocket"
@@ -30,7 +31,7 @@ func RegisterPhone(hub *messaging.Hub) http.HandlerFunc {
 			slog.Error("Failed to upgrade connection", "error", err)
 			return
 		}
-		phoneIP := net.ParseIP(r.RemoteAddr)
+		phoneIP := net.ParseIP(strings.Split(r.RemoteAddr, ":")[0])
 		client := messaging.NewClient(hub, conn, phoneIndex, phoneIP)
 		hub.Register <- client
 

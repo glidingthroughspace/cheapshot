@@ -9,6 +9,7 @@ import (
 // Hub maintains the set of active clients and broadcasts messages to the
 // clients.
 type Hub struct {
+	minimumNumberOfClients int
 	// Registered clients.
 	clients map[*Client]bool
 
@@ -36,6 +37,7 @@ func (h *Hub) Run(ctx context.Context) {
 	for {
 		select {
 		case client := <-h.Register:
+			slog.Info("Client registered", "index", client.phoneIndex, "ip", client.ip.String())
 			h.clients[client] = true
 		case client := <-h.unregister:
 			if _, ok := h.clients[client]; ok {
@@ -80,11 +82,27 @@ func (h *Hub) IPOfCenterPhone() net.IP {
 			return client.ip
 		}
 	}
+	return h.clientsByIndex()[numClients/2].ip
+}
+
+func (h *Hub) ClientCount() int {
+	return len(h.clients)
+}
+
+func (h *Hub) SetMinimumClientCount(count int) {
+	slog.Info("Setting minimum number of clients", "count", count)
+	h.minimumNumberOfClients = count
+}
+
+func (h *Hub) HasRequiredNumberOfClients() bool {
+	return h.ClientCount() >= h.minimumNumberOfClients
+}
+
+func (h *Hub) clientsByIndex() []*Client {
+	clients := make([]*Client, len(h.clients))
 	for client := range h.clients {
-		if client.phoneIndex == (numClients / 2) {
-			return nil
-		}
+		slog.Debug("Client by index", "phoneIndex", client.phoneIndex)
+		clients[client.phoneIndex-1] = client
 	}
-	slog.Error("No phone with an expected index is connected", "clients", numClients)
-	return nil
+	return clients
 }
