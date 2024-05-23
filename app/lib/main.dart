@@ -60,7 +60,20 @@ class CheapShotHomeState extends State<CheapShotHome> {
   late ConnectionStatus _connectionStatus;
   int? _phoneIndex;
   final APIClient _apiClient = APIClient();
-  RTCPeerConnection? _rtPeerConnection;
+  RTCPeerConnection? _rtcPeerConnection;
+  MediaStream? _localStream;
+  final constraints = {
+    'video': {
+      'facingMode': 'environment',
+    }
+  };
+  final rtcConfig = {
+    'iceServers': [
+      {
+        'urls': ["stun:stun.l.google.com:19302"]
+      }
+    ]
+  };
 
   @override
   void initState() {
@@ -68,9 +81,14 @@ class CheapShotHomeState extends State<CheapShotHome> {
     _connectionStatus = ConnectionStatus.disconnected;
     checkServerConnection();
     loadPhoneID();
-    _apiClient.onTakePictureEvent(onTakePicture);
-    _apiClient.onStartStreaming(onStartStraming);
-    _apiClient.onStopStreaming(onStopStreaming);
+    _apiClient.onTakePictureEvent(_onTakePicture);
+    _apiClient.onStartStreaming(_onStartStraming);
+    _apiClient.onStopStreaming(_onStopStreaming);
+    _apiClient.onConnectionStatusChange(_onConnectionStatusChange);
+    _apiClient.onStreamingPeerConnected = _onStreamingPeerConnected;
+    _apiClient.onRtcAnswer = _onRtcAnswer;
+    _apiClient.onIceCandidate = _onIceCandidate;
+
     // To display the current output from the Camera,
     // create a CameraController.
     _controller = CameraController(
@@ -85,7 +103,7 @@ class CheapShotHomeState extends State<CheapShotHome> {
     _initializeControllerFuture = _controller.initialize();
   }
 
-  onTakePicture(String snapshotId) async {
+  _onTakePicture(String snapshotId) async {
     log.fine("Trying to take a picture");
     // Take the Picture in a try / catch block. If anything goes wrong,
     // catch the error.
@@ -110,27 +128,51 @@ class CheapShotHomeState extends State<CheapShotHome> {
     }
   }
 
-  onStartStraming() async {
+  _onStartStraming() async {
     log.fine("Starting WebRTC stream");
-    _rtPeerConnection = await createPeerConnection({
-      'iceServers': []
-    }, {
-      'mandatory': {'OfferToReceiveVideo': true}
-    });
-    MediaStream stream = await navigator.mediaDevices.getUserMedia({
-      'audio': false,
-      'video': {
-        'facingMode': 'away',
-        'width': 640,
-        'height': 480,
-      },
-    });
-    await _rtPeerConnection?.addStream(stream);
+    _localStream = await navigator.mediaDevices.getUserMedia(constraints);
+    _apiClient.rawWebsocketMessage("broadcaster");
   }
 
-  onStopStreaming() async {
+  _onStreamingPeerConnected() async {
+    _rtcPeerConnection = await createPeerConnection(rtcConfig);
+    if (_localStream == null) {
+      log.severe("Trying to add a streaming peer before streaming was started");
+      return;
+    }
+    if (_rtcPeerConnection == null) {
+      log.severe("RTC Peer connection is null");
+      return;
+    }
+    _localStream!.getTracks().forEach((track) {
+      _rtcPeerConnection!.addTrack(track, _localStream!);
+    });
+    _rtcPeerConnection!.onIceCandidate = (event) {
+      if (event.candidate != null) {
+        log.fine("Sending ICE candidate to peer");
+        _apiClient.rawWebsocketMessage("canidate", event);
+      }
+    };
+    final offer = await _rtcPeerConnection!.createOffer();
+    await _rtcPeerConnection!.setLocalDescription(offer);
+    final description = await _rtcPeerConnection!.getLocalDescription();
+    log.fine("Sending offer to peer");
+    _apiClient.rawWebsocketMessage("offer", description);
+  }
+
+  _onRtcAnswer(RTCSessionDescription description) async {
+    log.fine("Received answer from peer");
+    await _rtcPeerConnection!.setRemoteDescription(description);
+  }
+
+  _onIceCandidate(RTCIceCandidate candidate) async {
+    log.fine("Received ICE candidate from peer");
+    await _rtcPeerConnection!.addCandidate(candidate);
+  }
+
+  _onStopStreaming() async {
     log.fine("Stopping WebRTC stream");
-    _rtPeerConnection?.dispose();
+    _rtcPeerConnection?.close();
   }
 
   checkServerConnection() async {
@@ -148,6 +190,12 @@ class CheapShotHomeState extends State<CheapShotHome> {
     var phoneIndex = await Config().getPhoneIndex();
     setState(() {
       _phoneIndex = phoneIndex;
+    });
+  }
+
+  _onConnectionStatusChange(ConnectionStatus status) {
+    setState(() {
+      _connectionStatus = status;
     });
   }
 
@@ -170,7 +218,7 @@ class CheapShotHomeState extends State<CheapShotHome> {
     // Dispose of the controller when the widget is disposed.
     _controller.dispose();
     _apiClient.disconnectFromServer();
-    _rtPeerConnection?.dispose();
+    _rtcPeerConnection?.dispose();
   }
 
   @override

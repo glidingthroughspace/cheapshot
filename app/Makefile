@@ -1,8 +1,15 @@
+.PHONY: build
 build:
 	flutter build apk
 
+.PHONY: install
+install:
+	adb install build/app/outputs/flutter-apk/app-release.apk
+
+.PHONY: run
 run:
 	flutter run
 
+.PHONY: uninstall
 uninstall:
-	~/Library/Android/sdk/platform-tools/adb uninstall space.glidingthrough.cheapshot
+	adb uninstall space.glidingthrough.cheapshot

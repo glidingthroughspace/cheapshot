@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:cheapshot/client/config.dart';
+import 'package:cheapshot/connection_status.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
+import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -11,6 +16,13 @@ class APIClient {
   Function(String snapshotId)? _onTakePictureEventListener;
   Function? _onStartStreaming;
   Function? _onStopStreaming;
+  Function(ConnectionStatus)? _onConnectionStatusChange;
+  Function? onStreamingPeerConnected;
+  Function(RTCSessionDescription)? onRtcAnswer;
+  Function(RTCIceCandidate)? onIceCandidate;
+  Timer? _reconnectTimer;
+  final _reconnectIntervalMs = 250;
+  var _reconnectCount = 100;
 
   Future<bool> serverIsReachable() async {
     if (await _config.getServerURL() == null) {
@@ -33,7 +45,10 @@ class APIClient {
     }
     var uri = Uri.parse("ws://$serverURL/phones/$phoneIndex");
     log.info("Connecting websocket to $uri");
-    _channel = WebSocketChannel.connect(uri);
+    _channel = IOWebSocketChannel.connect(uri);
+    _reconnectCount = 120;
+    _reconnectTimer?.cancel();
+    _onConnectionStatusChange?.call(ConnectionStatus.connected);
     _channel?.stream.listen((event) {
       if (event is String) {
         log.info("Received event '$event' from server");
@@ -50,11 +65,62 @@ class APIClient {
           if (_onStopStreaming != null) {
             _onStopStreaming!();
           }
+        } else if (event == "watcher") {
+          if (onStreamingPeerConnected != null) {
+            onStreamingPeerConnected!();
+          }
+        } else if (event.startsWith("answer")) {
+          if (onRtcAnswer != null) {
+            final description = event.split("|")[1];
+            log.fine("Received answer: $description");
+            onRtcAnswer!(RTCSessionDescription(description, "answer"));
+          }
+        } else if (event.startsWith("candidate")) {
+          final candidate = event.split("|")[1];
+          log.fine("Received answer: $candidate");
+          if (onIceCandidate != null) {
+            onIceCandidate!(RTCIceCandidate(candidate, "0", 0));
+          }
         }
       }
       log.info("WebSocket message from server: $event");
-    });
+    }, onError: (error) {
+      log.severe("WebSocket error", error);
+      _onConnectionStatusChange?.call(ConnectionStatus.disconnected);
+      _reconnect();
+    }, onDone: () {
+      log.warning("WebSocket connection closed");
+      _onConnectionStatusChange?.call(ConnectionStatus.disconnected);
+      _reconnect();
+    }, cancelOnError: true);
     return _channel?.ready.timeout(const Duration(seconds: 3));
+  }
+
+  _reconnect() async {
+    var serverURL = await _config.getServerURL();
+    if (serverURL == null) {
+      throw Exception("Server URL not set");
+    }
+    var phoneIndex = await _config.getPhoneIndex();
+    if (phoneIndex == null) {
+      throw Exception("Phone index not set");
+    }
+    log.info("Reconnecting to server");
+    if ((_reconnectTimer == null || _reconnectTimer?.isActive == false) && _reconnectCount > 0) {
+      _reconnectTimer = Timer.periodic(Duration(milliseconds: _reconnectIntervalMs), (Timer timer) async {
+        if (_reconnectCount == 0) {
+          _reconnectTimer?.cancel();
+          throw Exception("Failed to reconnect to server");
+        }
+        log.fine("Reconnecting... $_reconnectCount attempts left");
+        try {
+          await connectToServer(phoneIndex);
+        } catch (e) {
+          log.fine("Reconnection attempt failed");
+        }
+        _reconnectCount--;
+      });
+    }
   }
 
   Future<void> uploadPhoto(String path, String snapshotId) async {
@@ -88,9 +154,21 @@ class APIClient {
     _onStopStreaming = f;
   }
 
+  void onConnectionStatusChange(Function(ConnectionStatus) f) {
+    _onConnectionStatusChange = f;
+  }
+
   void disconnectFromServer() {
     log.info("Disconnecting WebSocket");
     _channel?.sink.close(status.goingAway);
+  }
+
+  void rawWebsocketMessage(String msg, [dynamic data]) {
+    if (data != null) {
+      _channel?.sink.add("$msg|$data");
+    } else {
+      _channel?.sink.add(msg);
+    }
   }
 
   Future<Uri> buildURI(String path, Map<String, String>? query) async {
