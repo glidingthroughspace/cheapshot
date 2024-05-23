@@ -4,12 +4,16 @@ set -euo pipefail
 # This script takes all files in a folder given as an argument and turns them into a video showing each photo for 250ms. The video plays backwards once after reaching the end
 # Get the folder path from the command line argument
 folder_path=$1
-output_filename="$(basename "$1").mp4"
-
 # Check if the folder path is provided
 if [ -z "$folder_path" ]; then
   echo "Please provide the folder path as an argument."
   exit 1
+fi
+output_filename="$(basename "$1").mp4"
+
+output_dir=$2
+if [ -n "$output_dir" ]; then
+  output_filename="$output_dir/$output_filename"
 fi
 
 # Create a temporary directory to store the resized images
