@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Capture | Cheapshot</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='common.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='capture.css') }}"
+    />
+  </head>
+  <body>
+    <div class="camera">
+      <video id="video">Video stream not available.</video>
+      <button id="startbutton">Take photo</button>
+    </div>
+
+    <div class="output">
+      <img id="photo" alt="The screen capture will appear in this box." />
+    </div>
+    <script src="{{ url_for('static', filename='capture.js') }}"></script>
+  </body>
+</html>
