@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Manage | Cheapshot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='common.css') }}"
+  </head>
+  <body>
+    <script>
+      async function triggerSnapshot() {
+        await fetch(`/api/v1/snapshots`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+        window.setTimeout(function () {
+          window.location.reload();
+        }, 1000);
+      }
+      function reloadPhones() {
+        fetch(`/api/v1/debug/reload`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+      }
+    </script>
+    <div>Number of connected phones {{ num_phones }}</div>
+    <button id="take-photo" onclick="triggerSnapshot()">Take photo</button>
+    <button id="reload-all-phones" onclick="reloadPhones()">
+      Reload site on all phones
+    </button>
+    <ul id="snapshot-list">
+      {% for snapshot in snapshots %}
+      <li>
+        <a href="{{ snapshot.url }}">{{ snapshot.name }}</a>
+        {% if snapshot.status == 'processing' %}
+        <span>Processing</span>
+        {% elif snapshot.status == 'complete' %}
+        <span>Complete</span>
+        <video src="{{ snapshot.url }}" autoplay loop></video>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    <script src="{{ url_for('static', filename='socket.io.4.7.5.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='manage.js') }}"></script>
+  </body>
+</html>
