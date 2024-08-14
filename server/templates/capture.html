@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Capture | Cheapshot</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='common.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='capture.css') }}"
+    />
+  </head>
+  <body>
+    <div id="previewContainer">
+      <img id="preview" src="/api/v1/snapshots/preview/photos/1" />
+      <div id="countdownContainer"></div>
+    </div>
+    <button id="trigger" type="button">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <path
+          d="M4,4H7L9,2H15L17,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9Z"
+        />
+      </svg>
+    </button>
+    <script>
+      window.phone_index = "{{ phone_index }}";
+    </script>
+    <script src="{{ url_for('static', filename='socket.io.4.7.5.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='capture.js') }}"></script>
+  </body>
+</html>
