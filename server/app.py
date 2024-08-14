@@ -43,6 +43,11 @@ def debug():
     )
 
 
+@app.route("/capture")
+def capture():
+    return render_template("capture.html")
+
+
 @app.post("/api/v1/debug/reload")
 def reload_phones():
     socketio.emit("reload")
