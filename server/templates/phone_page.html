@@ -18,6 +18,8 @@
       <video id="preview" autoplay></video>
       <div id="countdownContainer"></div>
       <canvas id="canvas"></canvas>
+      <span id="phoneIndex">{{ phone_index }}</span>
+      <pre id="devices"></p>
     </div>
     <button id="trigger" type="button">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -26,7 +28,6 @@
         />
       </svg>
     </button>
-    <div id="snapshots"></div>
     <script>
       window.phone_index = "{{ phone_index }}";
     </script>

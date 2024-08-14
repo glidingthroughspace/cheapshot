@@ -34,20 +34,42 @@ function startup() {
   canvas = document.getElementById("canvas");
   trigger = document.getElementById("trigger");
 
-  navigator.mediaDevices.enumerateDevices().then((devices) => {
-    // alert(JSON.stringify(devices, null, 2));
-  });
+  window.setTimeout(function () {
+    navigator.mediaDevices
+      .enumerateDevices()
+      .then((devices) => {
+        document.querySelector("#devices").innerText = JSON.stringify(
+          devices
+            .map((device) =>
+              device instanceof InputDeviceInfo
+                ? {
+                    name: device.label,
+                    capabilities: device.getCapabilities(),
+                  }
+                : null
+            )
+            .filter((device) => device !== null),
+          null,
+          2
+        );
+      })
+      .catch((err) => alert(err));
+  }, 2000);
 
   navigator.mediaDevices
     .getUserMedia({
-      video: { facingMode: "environment", /*width: 1920,*/ height: 1080 },
+      video: {
+        facingMode: "environment",
+        width: { exact: 4032 },
+        height: { exact: 3024 },
+      },
     })
     .then((stream) => {
       video.srcObject = stream;
       video.play();
     })
     .catch((err) => {
-      alert(`An error occurred: ${err}`);
+      alert(`Error opening camera: ${err}`);
     });
 
   video.addEventListener(
@@ -82,12 +104,12 @@ function startup() {
     false
   );
 
-  var socket = io.connect();
+  var socket = io.connect("/phones");
   socket.on("connect", function () {
     console.log("Websocket connected!");
   });
   socket.on("disconnect", function () {
-    alert("Disconnected from server");
+    console.log("Websocket disconnected!");
   });
   socket.on("message", function (msg) {
     console.log("Received message: " + msg);

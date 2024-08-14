@@ -7,3 +7,7 @@ body {
   background: #f4f4f5;
   color: #3f3f46;
 }
+
+#manage-preview {
+  max-width: 400px;
+}

@@ -28,11 +28,14 @@
         });
       }
     </script>
-    <div>Number of connected phones {{ num_phones }}</div>
+    <div>
+      Number of connected phones <span id="numphones">{{ num_phones }}</span>
+    </div>
     <button id="take-photo" onclick="triggerSnapshot()">Take photo</button>
     <button id="reload-all-phones" onclick="reloadPhones()">
       Reload site on all phones
     </button>
+    <button id="preview" onclick="previewPhoto()">Take preview photo</button>
     <ul id="snapshot-list">
       {% for snapshot in snapshots %}
       <li>
@@ -46,6 +49,7 @@
       </li>
       {% endfor %}
     </ul>
+    <img id="manage-preview" src="/api/v1/snapshots/preview/photos/1" />
     <script src="{{ url_for('static', filename='socket.io.4.7.5.min.js') }}"></script>
     <script src="{{ url_for('static', filename='manage.js') }}"></script>
   </body>

@@ -55,7 +55,7 @@ def create_snapshot():
     timestamp = datetime.now().strftime("%y%m%d%H%M%S")
     snapshot_id = timestamp + "-" + generate_id(4)
     app.logger.info(f"Snapshot {snapshot_id} created, triggering phones")
-    socketio.emit("take_snapshot", {"id": snapshot_id})
+    socketio.emit("take_snapshot", {"id": snapshot_id}, namespace="/phones")
     return jsonify(
         {
             "id": snapshot_id,
@@ -69,6 +69,13 @@ def api_get_snapshots():
     return jsonify(get_snapshots())
 
 
+@app.get("/api/v1/preview-photo")
+def api_get_preview_photo():
+    # Emit a message to all phones to take a photo and upload it
+    socketio.emit("take_snapshot", {"id": "preview"}, namespace="/phones")
+    return jsonify({"message": "Preview photo taken"})
+
+
 def get_snapshots():
     # Read all folders in the snapshots directory
     snapshots = [
@@ -76,6 +83,8 @@ def get_snapshots():
         for name in os.listdir("./snapshots")
         if os.path.isdir(os.path.join("./snapshots", name))
     ]
+    # Filter out the special 'preview' snapshot
+    snapshots = [snapshot for snapshot in snapshots if snapshot["name"] != "preview"]
     # Add a status field to each snapshot. If the snapshot is complete, the status will be 'complete'. Otherwise, it will be 'processing'
     for snapshot in snapshots:
         snapshot_dir = f"./snapshots/{snapshot}"
@@ -161,29 +170,43 @@ def upload_photo(snapshot_id, phone_index):
     return jsonify({"message": "Photo uploaded successfully"})
 
 
+@app.get("/api/v1/snapshots/<snapshot_id>/photos/<phone_index>")
+def get_photo(snapshot_id, phone_index):
+    snapshot_dir = f"./snapshots/{snapshot_id}"
+    if not os.path.exists(snapshot_dir):
+        return jsonify({"error": "Snapshot not found"}), 404
+    return send_file(f"./snapshots/{snapshot_id}/{phone_index}.webp")
+
+
 def generate_id(length=12):
     characters = string.ascii_letters + string.digits
     return "".join(random.choice(characters) for _ in range(length))
 
 
-@socketio.on("connect")
-def handle_connect():
-    app.logger.info("Client connected")
+@socketio.on("connect", namespace="/phones")
+def handle_phone_connect():
+    app.logger.info("Phone connected")
     global num_phones
     num_phones = num_phones + 1
+    socketio.emit("phone_connected", {"num_phones": num_phones}, namespace="/manage")
 
 
-@socketio.on("disconnect")
-def handle_disconnect():
-    app.logger.info("Client disconnected")
+@socketio.on("disconnect", namespace="/phones")
+def handle_phone_disconnect():
+    app.logger.info("Phone disconnected")
     global num_phones
     num_phones = num_phones - 1
+    socketio.emit("phone_disconnected", {"num_phones": num_phones}, namespace="/manage")
 
 
-# Example WebSocket event handler
-@socketio.on("message")
-def handle_message(message):
-    print("received message: " + message)
+@socketio.on("connect", namespace="/manage")
+def handle_manage_connect():
+    app.logger.info("Managment page connected")
+
+
+@socketio.on("disconnect", namespace="/manage")
+def handle_manage_disconnect():
+    app.logger.info("Management page disconnected")
 
 
 if __name__ == "__main__":
