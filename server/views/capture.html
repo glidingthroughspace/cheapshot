@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Cheapshot | Capture</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="icon" href="/favicon/favicon-192x192.png" sizes="192x192" />
+    <style>
+      body {
+        padding: 0;
+        height: 100svh;
+        width: 100svw;
+        display: flex;
+        align-items: center;
+        justify-content: space-evenly;
+        flex-direction: column;
+        margin: 0;
+        overflow: hidden;
+      }
+      .trigger {
+        aspect-ratio: 1/1;
+        height: clamp(100px, 20svh, 250px);
+        border-radius: 50%;
+        background: radial-gradient(
+          circle,
+          rgba(255, 55, 55, 1) 0%,
+          rgba(193, 10, 10, 1) 100%
+        );
+        border: none;
+        cursor: pointer;
+        font-size: clamp(16px, 300%, 75px);
+        color: white;
+      }
+      .preview {
+        background: #d6d3d1;
+        border-radius: 10px;
+        height: clamp(100px, 75svh, 600px);
+        aspect-ratio: 3/4;
+      }
+      .countdown {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.2);
+        backdrop-filter: blur(5px);
+        color: white;
+        font-size: 10rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .countdown.visible {
+        visibility: visible;
+        opacity: 1;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="preview"></div>
+    <button class="trigger">📸</button>
+    <div class="countdown">3</div>
+    <script src="/js/capture.js" type="module"></script>
+  </body>
+</html>

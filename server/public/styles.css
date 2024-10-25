@@ -1,0 +1,92 @@
+html {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  padding: 24px;
+  margin: 0;
+  background-color: #f5f5f4;
+  color: #44403c;
+  line-height: 1.5;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 48px;
+}
+
+header h1 {
+  font-size: 2.25rem;
+  font-weight: 860;
+  line-height: 1.1;
+  margin: 0;
+}
+
+section + section {
+  margin-bottom: 2.25rem;
+}
+
+section h2 {
+  font-size: 1.5rem;
+  font-weight: 860;
+  line-height: 1.2;
+  margin-bottom: 1.5rem;
+}
+
+section .container {
+  border: 2px dashed #d6d3d1;
+  border-radius: 10px;
+  padding: 16px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: #0c0a09;
+}
+
+button {
+  appearance: none;
+  border: none;
+  outline: none;
+  display: flex;
+  font-size: 1rem;
+  font-weight: 500;
+  border-radius: 5px;
+  border-bottom: 1px solid #e7e5e4;
+  background-color: #44403c;
+  color: #fafaf9;
+  padding: 8px 12px;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+button.primary {
+  background: #3b82f6;
+  color: #eff6ff;
+  border-bottom: 1px solid #bfdbfe;
+}
+
+button.destructive {
+  background: #dc2626;
+  color: #fee2e2;
+  border-bottom: 1px solid #fca5a5;
+}
+
+button:disabled {
+  background: #e7e5e4;
+  border-bottom: 1px solid transparent;
+  color: #57534e;
+  cursor: not-allowed;
+  pointer-events: none;
+}
