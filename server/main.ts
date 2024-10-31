@@ -19,7 +19,12 @@ const io = new Server(httpServer, {
 
 type CaptureDevice = {
   id?: string;
-  socketId: string;
+  /**
+   * If the socket ID is nullish, the device currently isn't connected. If a new
+   * device connects with the same ID, the server will auto-reset to the
+   * "capturing" state and update the socket ID.
+   */
+  socketId?: string;
 };
 
 type CaptureController = {
@@ -79,7 +84,7 @@ function potentiallyDisconnectCaptureController(socketId: string) {
 function potentiallyDisconnectCaptureDevice(socketId: string) {
   const dev = captureDevices.find((d) => d.socketId === socketId);
   if (dev) {
-    captureDevices = captureDevices.filter((d) => d.socketId !== socketId);
+    dev.socketId = undefined;
     log("warn", `Capture device disconnected (${dev.id})`);
     if (currentStatus === "capturing") {
       currentStatus = "capture_device_disconnected";
@@ -97,7 +102,20 @@ function connectCaptureDevice(device: CaptureDevice) {
     throw new Error(
       `Cannot connect capture device in state '${currentStatus}'`
     );
-  captureDevices.push(device);
+  if (!device.id) {
+    throw new Error(
+      `Capture device with socket ID ${device.socketId} didn't announce an ID`
+    );
+  }
+  const existingDevice = captureDevices.find((d) => d.id === device.id);
+  if (existingDevice) {
+    existingDevice.socketId = device.socketId;
+    if (currentStatus === "capture_device_disconnected") {
+      currentStatus = "ready";
+    }
+  } else {
+    captureDevices.push(device);
+  }
   sendManagementUpdate();
   log("info", `Capture device connected: ${device.id}`);
 }
@@ -106,6 +124,10 @@ function sendManagementUpdate() {
   io.to("management").emit("new-server-state", {
     captureDevices,
     captureControllers,
+    serverStatusText: serverStatusMessages[currentStatus],
+    currentStatus,
+  });
+  io.to("capture-controller").emit("new-server-state", {
     serverStatusText: serverStatusMessages[currentStatus],
     currentStatus,
   });
@@ -216,7 +238,10 @@ app.post("/api/v1/capture", express.json(), async (req, res) => {
       .status(412);
     return;
   }
-  const captureId = nanoid();
+  const now = new Date();
+  const captureId = `${now.getUTCFullYear()}${now.getUTCMonth()}${now.getUTCDay()}-${now.getHours()}${now.getMinutes()}${now.getSeconds()}-${nanoid(
+    3
+  )}`;
   log("info", `New capture started: ${captureId}`);
   await mkdir(`./captures/${captureId}`, { recursive: true });
   io.to("capture-device").emit("capture-now", { captureId });
@@ -277,8 +302,8 @@ async function generateVideo(captureId: string) {
       console.debug("Copying", src, "to", dst);
       await $`cp ${src} ${dst}`;
     }
-    await $`ffmpeg -framerate 12 -i "${tempDir}/%d.jpg" -filter_complex \
-  '[0]split=3[f1][f2][f3];[f2]reverse[r];[f1][r][f3]concat=n=3:v=1:a=0' \
+    await $`ffmpeg -framerate 12 -autorotate -i "${tempDir}/%d.jpg" -filter_complex \
+  'format=yuv420p,[0]split=3[f1][f2][f3];[f2]reverse[r];[f1][r][f3]concat=n=3:v=1:a=0' \
   -c:v libx264 -r 30 -pix_fmt yuvj422p \
   "./captures/${captureId}/${captureId}.mp4"`;
 
@@ -329,6 +354,9 @@ io.on("connection", (socket) => {
   }
   socket.on("error", (err) => {
     log("error", `Socket.IO error ${err}`);
+  });
+  socket.on("log", (data) => {
+    io.to("management").emit("log", data);
   });
   socket.on("disconnect", () => {
     potentiallyDisconnectCaptureController(socket.id);

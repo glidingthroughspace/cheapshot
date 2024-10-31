@@ -1,5 +1,11 @@
 export function createApiClient(log) {
   return function api(endpoint, method = "GET", body = undefined) {
+    log({
+      level: "debug",
+      timestamp: Date.now(),
+      source: "API",
+      message: `Calling ${method} ${endpoint}`,
+    });
     return fetch(`/api/v1${endpoint}`, {
       method,
       headers: {

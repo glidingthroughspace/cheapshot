@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "bun run --bun --watch main.ts",
     "start": "bun run --bun main.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "clean": "rm -rf captures"
   },
   "keywords": [],
   "author": "",

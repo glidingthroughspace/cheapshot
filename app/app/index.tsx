@@ -57,10 +57,10 @@ const CameraScreen: React.FC = () => {
       async ({ captureId }: { captureId: string }) => {
         console.log("Capturing now!");
         const picture = await camera.current?.takePictureAsync({
-          quality: 0.9,
+          quality: 0.85,
           exif: true,
           imageType: "jpg",
-          base64: true,
+          skipProcessing: false,
         });
         if (picture) {
           const formData = new FormData();
@@ -70,8 +70,6 @@ const CameraScreen: React.FC = () => {
             name: `${captureId}-${deviceId}.jpg`,
             type: "image/jpeg",
           };
-          // const blob = await (await fetch(file.uri)).blob();
-          // console.debug("Blob size", blob.size);
           // @ts-ignore
           formData.append("photo", file);
 
@@ -90,10 +88,9 @@ const CameraScreen: React.FC = () => {
 
             console.log("Server response status:", response.status);
             const responseText = await response.text();
-            console.log("Server response:", responseText);
 
             if (response.ok) {
-              alert("Photo uploaded successfully!");
+              console.info("Photo uploaded successfully!");
             } else {
               throw new Error(
                 `Server responded with status ${response.status}: ${responseText}`

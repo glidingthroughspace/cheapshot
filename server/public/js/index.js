@@ -1,7 +1,10 @@
 import { createApiClient } from "./lib/api.js";
-import { createLogger } from "./lib/log.js";
-const log = createLogger(document.querySelector(".logs-container"));
-const api = createApiClient(log);
+import { createLocalLogger } from "./lib/log.js";
+const log = createLocalLogger(
+  "MGMNT",
+  document.querySelector(".logs-container")
+);
+const api = createApiClient(({ level, message }) => log(level, message));
 const deviceContainer = document.getElementById("device-container");
 
 Sortable.create(deviceContainer, {
@@ -26,20 +29,10 @@ const socket = io({
 const mainActionButton = document.getElementById("main-action-button");
 mainActionButton.addEventListener("click", () => {
   if (mainActionButton.classList.contains("primary")) {
-    log({
-      level: "debug",
-      timestamp: Date.now(),
-      source: "MGMNT",
-      message: "Starting capture mode",
-    });
+    log("debug", "Starting capture mode");
     api("/management/start-capture", "POST");
   } else {
-    log({
-      level: "debug",
-      timestamp: Date.now(),
-      source: "MGMNT",
-      message: "Stopping capture mode",
-    });
+    log("debug", "Stopping capture mode");
     api("/management/stop-capture", "POST");
   }
 });
@@ -63,7 +56,7 @@ socket.on("new-server-state", (state) => {
 });
 
 socket.on("log", function (params) {
-  log(params);
+  log(params.level, params.message, params.timestamp, params.source);
 });
 
 function updateMainActionButton(serverStatus) {
