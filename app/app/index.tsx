@@ -7,6 +7,7 @@ import { useDeviceId } from "@/hooks/useDeviceId";
 import { useLastServerHost } from "@/hooks/useLastServerHost";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { Camera, CameraView } from "expo-camera";
+import { useKeepAwake } from "expo-keep-awake";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   StyleSheet,
@@ -28,6 +29,7 @@ const CameraScreen: React.FC = () => {
   const bottomSheetModalRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ["25%"], []);
   const camera = useRef<CameraView>(null);
+  useKeepAwake();
 
   useEffect(() => {
     (async () => {
@@ -145,14 +147,21 @@ const CameraScreen: React.FC = () => {
             onChangeText={setServerIp}
             value={serverIp}
             style={styles.serverIpInput}
+            aria-disabled={
+              connectionStatus === "connecting" ||
+              connectionStatus === "connected"
+            }
           ></TextInput>
           <TouchableOpacity
             style={styles.button}
             onPress={() => {
               connectToServer();
             }}
+            disabled={connectionStatus === "connecting"}
           >
-            <Text style={styles.buttonText}>Connect</Text>
+            <Text style={styles.buttonText}>
+              {connectionStatus === "disconnected" ? "Connect" : "Disconnect"}
+            </Text>
           </TouchableOpacity>
         </BottomSheetView>
       </BottomSheet>
