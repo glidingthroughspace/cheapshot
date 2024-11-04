@@ -16,7 +16,7 @@ Sortable.create(deviceContainer, {
       (deviceElement) => deviceElement.id
     );
     console.log("New devices: ", devices);
-    api("/api/v1/management/set-device-order", "POST", { devices });
+    api("/management/set-device-order", "POST", { devices });
   },
 });
 
