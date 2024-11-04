@@ -3,9 +3,11 @@ import ejs from "ejs";
 import express from "express";
 import multer from "multer";
 import { nanoid } from "nanoid";
+import dns from "node:dns/promises";
 import { readdirSync, statSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { createServer } from "node:http";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { Server } from "socket.io";
@@ -131,6 +133,16 @@ function sendManagementUpdate() {
     serverStatusText: serverStatusMessages[currentStatus],
     currentStatus,
   });
+}
+
+function fault(err: any) {
+  currentStatus = "faulty";
+  if ("message" in err) {
+    log("error", `Server fault: ${err.message}`);
+  } else {
+    log("error", `Unknown server fault: ${err}`);
+  }
+  sendManagementUpdate();
 }
 
 let captureDevices: CaptureDevice[] = [];
@@ -270,12 +282,16 @@ app.put(
         filename: req.file.filename,
         path: req.file.path,
       });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+    try {
       if (allUploadsComplete(captureId)) {
         log("info", `All photos received for capture ${captureId}`);
         generateVideo(captureId);
       }
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+    } catch (err) {
+      fault(err);
     }
   }
 );
@@ -299,15 +315,22 @@ async function generateVideo(captureId: string) {
       const dst = `${tempDir}/${captureDevices.findIndex(
         (dev) => dev.id === file.split(".jpg")[0]
       )}.jpg`;
-      console.debug("Copying", src, "to", dst);
+      log("debug", `Copying ${src} to ${dst}`);
       await $`cp ${src} ${dst}`;
     }
-    await $`ffmpeg -framerate 12 -autorotate -i "${tempDir}/%d.jpg" -filter_complex \
-  'format=yuv420p,[0]split=3[f1][f2][f3];[f2]reverse[r];[f1][r][f3]concat=n=3:v=1:a=0' \
-  -c:v libx264 -r 30 -pix_fmt yuvj422p \
-  "./captures/${captureId}/${captureId}.mp4"`;
-
-    log("info", `Video for capture ${captureId} generated`);
+    try {
+      await $`ffmpeg -framerate 6 -i "${tempDir}/%d.jpg" -c:v libx264 -r 30 -pix_fmt yuvj422p "${tempDir}/single.mp4"`.quiet();
+      await $`ffmpeg -y -i "${tempDir}/single.mp4" -filter_complex '[0]reverse[r];[0][r][0]concat=n=3' "./captures/${captureId}/${captureId}.mp4"`.quiet();
+      //     await $`ffmpeg -framerate 12 -autorotate -i "${tempDir}/%d.jpg" -filter_complex \
+      // 'format=yuv420p,[0]split=3[f1][f2][f3];[f2]reverse[r];[f1][r][f3]concat=n=3:v=1:a=0' \
+      // -c:v libx264 -r 30 -pix_fmt yuvj422p \
+      // "./captures/${captureId}/${captureId}.mp4"`.quiet();
+      log("info", `Video for capture ${captureId} generated`);
+    } catch (err) {
+      log("error", `Failed to generate video for capture ${captureId}`);
+      log("error", err.stdout.toString());
+      log("error", err.stderr.toString());
+    }
   } catch (error) {
     log("error", `Failed to process capture ${captureId}: ${error.message}`);
   } finally {
@@ -370,9 +393,12 @@ io.on("error", (err) => {
 
 // Start the server
 const PORT = process.env.PORT || 3000;
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, async () => {
+  const options = { family: 4 };
+
+  const addr = await dns.lookup(os.hostname(), options);
   console.log(`Server is now running.`);
   console.log(`🔧 Management UI: http://localhost:${PORT}`);
-  console.log(`🎛️ Capture Controller: http://localhost:${PORT}/capture`); // TODO: Make this the public IP
-  console.log(`📸 Capture Device: localhost:${PORT}`); // TODO: Make this the public IP
+  console.log(`🎛️  Capture Controller: http://${addr.address}:${PORT}/capture`);
+  console.log(`📸 Capture Device: ${addr.address}:${PORT}`);
 });
