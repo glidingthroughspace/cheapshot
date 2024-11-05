@@ -55,6 +55,12 @@
         border-radius: 999px;
         background: #44403c;
         aspect-ratio: 1/1;
+        appearance: none;
+        cursor: pointer;
+      }
+
+      .device .camera.isPreviewDevice {
+        border: 2px solid #dc2626;
       }
 
       .sortable-ghost {
@@ -95,7 +101,7 @@
     <div id="device-container" class="device-container container">
       <% captureDevices.forEach(function(device) { %>
         <div class="device" id="<%= device.id %>">
-          <div class="camera"></div>
+          <button class="camera <%= (device.isPreviewDevice) ? 'isPreviewDevice' : '' %>"></button>
           <div class="device-id"><%= device.id %></div>
         </div>
       <% }); %>
@@ -104,10 +110,8 @@
     <section>
       <h2>Logs</h2>
       <div class="logs-container container">
-
       </div>
     </section>
-
     <script src="/js/index.js" type="module">
     </script>
   </body>

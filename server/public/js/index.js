@@ -7,6 +7,12 @@ const log = createLocalLogger(
 const api = createApiClient(({ level, message }) => log(level, message));
 const deviceContainer = document.getElementById("device-container");
 
+Array.from(deviceContainer.children).forEach((device) => {
+  device.querySelector("button.camera").addEventListener("click", () => {
+    api("/management/set-preview-device", "POST", { deviceId: device.id });
+  });
+});
+
 Sortable.create(deviceContainer, {
   animation: 150, // Animation speed in ms
   ghostClass: "sortable-ghost", // Class name for the drop placeholder
@@ -49,9 +55,18 @@ socket.on("new-server-state", (state) => {
     deviceElement.classList.add("device");
     deviceElement.id = device.id;
     deviceElement.innerHTML = `
-        <div class="camera"></div><div class="device-id">${device.id}</div>`;
+        <button class="camera ${
+          device.isPreviewDevice ? "isPreviewDevice" : ""
+        }"></button><div class="device-id">${device.id}</div>`;
     deviceContainer.appendChild(deviceElement);
   }
+
+  Array.from(deviceContainer.children).forEach((device) => {
+    device.querySelector("button.camera").addEventListener("click", () => {
+      api("/management/set-preview-device", "POST", { deviceId: device.id });
+    });
+  });
+
   updateMainActionButton(state.currentStatus);
 });
 
