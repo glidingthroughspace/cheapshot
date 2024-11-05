@@ -1,16 +1,13 @@
-import { $ } from "bun";
 import ejs from "ejs";
 import express from "express";
 import multer from "multer";
-import { nanoid } from "nanoid";
 import dns from "node:dns/promises";
-import { readdirSync, statSync } from "node:fs";
-import { mkdir } from "node:fs/promises";
 import { createServer } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { Server } from "socket.io";
+import { allUploadsComplete, createCapture } from "./capture";
 
 const app = express();
 const httpServer = createServer(app);
@@ -27,6 +24,8 @@ type CaptureDevice = {
    * "capturing" state and update the socket ID.
    */
   socketId?: string;
+  isPreviewDevice: boolean;
+  previewIsActive: boolean;
 };
 
 type CaptureController = {
@@ -250,14 +249,15 @@ app.post("/api/v1/capture", express.json(), async (req, res) => {
       .status(412);
     return;
   }
-  const now = new Date();
-  const captureId = `${now.getUTCFullYear()}${now.getUTCMonth()}${now.getUTCDay()}-${now.getHours()}${now.getMinutes()}${now.getSeconds()}-${nanoid(
-    3
-  )}`;
-  log("info", `New capture started: ${captureId}`);
-  await mkdir(`./captures/${captureId}`, { recursive: true });
-  io.to("capture-device").emit("capture-now", { captureId });
-  res.json({ success: true, captureId }).status(200);
+  const { id } = await createCapture(
+    captureDevices
+      .filter((dev) => dev.socketId !== undefined)
+      .map((dev) => dev.id)
+      .filter((id) => id !== undefined)
+  );
+  log("info", `New capture started: ${id}`);
+  io.to("capture-device").emit("capture-now", { id });
+  res.json({ success: true, id }).status(200);
 });
 
 app.put(
@@ -288,55 +288,21 @@ app.put(
     try {
       if (allUploadsComplete(captureId)) {
         log("info", `All photos received for capture ${captureId}`);
-        generateVideo(captureId);
+
+        log("info", `Starting FFMPEG for capture ${captureId}`);
+        try {
+          log("info", `Video for capture ${captureId} generated`);
+        } catch (err) {
+          log("error", `Failed to generate video for capture ${captureId}`);
+          log("error", err.stdout.toString());
+          log("error", err.stderr.toString());
+        }
       }
     } catch (err) {
       fault(err);
     }
   }
 );
-
-function allUploadsComplete(captureId: string) {
-  return captureDevices.every((device) => {
-    return statSync(`./captures/${captureId}/${device.id}.jpg`).isFile();
-  });
-}
-
-async function generateVideo(captureId: string) {
-  log("info", `Starting FFMPEG for capture ${captureId}`);
-  // Start FFMPEG
-  // Create a temporary directory to store the resized images
-  const tempDir = (await $`mktemp -d`.text()).trimEnd();
-  try {
-    // Resize and copy the images to the temporary directory
-    for (const file of readdirSync(`./captures/${captureId}`)) {
-      //   convert "$file" -resize 2160x3840 "$temp_dir/$(basename "$file")"
-      const src = `./captures/${captureId}/${file}`;
-      const dst = `${tempDir}/${captureDevices.findIndex(
-        (dev) => dev.id === file.split(".jpg")[0]
-      )}.jpg`;
-      log("debug", `Copying ${src} to ${dst}`);
-      await $`cp ${src} ${dst}`;
-    }
-    try {
-      await $`ffmpeg -framerate 6 -i "${tempDir}/%d.jpg" -c:v libx264 -r 30 -pix_fmt yuvj422p "${tempDir}/single.mp4"`.quiet();
-      await $`ffmpeg -y -i "${tempDir}/single.mp4" -filter_complex '[0]reverse[r];[0][r][0]concat=n=3' "./captures/${captureId}/${captureId}.mp4"`.quiet();
-      //     await $`ffmpeg -framerate 12 -autorotate -i "${tempDir}/%d.jpg" -filter_complex \
-      // 'format=yuv420p,[0]split=3[f1][f2][f3];[f2]reverse[r];[f1][r][f3]concat=n=3:v=1:a=0' \
-      // -c:v libx264 -r 30 -pix_fmt yuvj422p \
-      // "./captures/${captureId}/${captureId}.mp4"`.quiet();
-      log("info", `Video for capture ${captureId} generated`);
-    } catch (err) {
-      log("error", `Failed to generate video for capture ${captureId}`);
-      log("error", err.stdout.toString());
-      log("error", err.stderr.toString());
-    }
-  } catch (error) {
-    log("error", `Failed to process capture ${captureId}: ${error.message}`);
-  } finally {
-    await $`rm -rf "${tempDir}"`;
-  }
-}
 
 app.post(
   "/api/v1/debug/connect-capture-controller",
@@ -355,10 +321,29 @@ app.post("/api/v1/debug/generate-dummy-devices", express.json(), (req, res) => {
     connectCaptureDevice({
       socketId: Math.random().toString(36).substring(3, 8),
       id: Math.random().toString(36).substring(3, 8),
+      isPreviewDevice: false,
+      previewIsActive: false,
     });
   }
   res.json({ captureDevices });
 });
+
+app.post(
+  "/api/v1/management/set-preview-device",
+  express.json(),
+  (req, res) => {
+    const { deviceId } = req.body;
+    log("debug", `Setting preview device to device ${deviceId}`);
+    captureDevices.forEach((dev) => (dev.isPreviewDevice = false));
+    let dev = captureDevices.find((dev) => dev.id === deviceId);
+    if (dev) {
+      dev.isPreviewDevice = true;
+    } else {
+      throw new Error(`Device with id ${deviceId} doesn't exist`);
+    }
+    sendManagementUpdate();
+  }
+);
 
 // Socket.IO connection handler
 io.on("connection", (socket) => {
@@ -373,6 +358,8 @@ io.on("connection", (socket) => {
     connectCaptureDevice({
       socketId: socket.id,
       id: socket.handshake.headers["id"] as string,
+      isPreviewDevice: false,
+      previewIsActive: false,
     });
   }
   socket.on("error", (err) => {
@@ -430,9 +417,16 @@ const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, async () => {
   const options = { family: 4 };
 
-  const addr = await dns.lookup(os.hostname(), options);
+  let hostname = "localhost";
+
+  try {
+    const { address } = await dns.lookup(os.hostname(), options);
+    hostname = address;
+  } catch {
+    console.log("DNS resolution failed, showing localhost addresses");
+  }
   console.log(`Server is now running.`);
   console.log(`🔧 Management UI: http://localhost:${PORT}`);
-  console.log(`🎛️  Capture Controller: http://${addr.address}:${PORT}/capture`);
-  console.log(`📸 Capture Device: ${addr.address}:${PORT}`);
+  console.log(`🎛️  Capture Controller: http://${hostname}:${PORT}/capture`);
+  console.log(`📸 Capture Device: ${hostname}:${PORT}`);
 });
