@@ -385,6 +385,40 @@ io.on("connection", (socket) => {
     potentiallyDisconnectCaptureController(socket.id);
     potentiallyDisconnectCaptureDevice(socket.id);
   });
+
+  // This is for handling the preview WebRTC stream
+  // Handle room joining
+  socket.on("join-room", (roomId) => {
+    socket.join(roomId);
+    console.log(`Socket ${socket.id} joined room ${roomId}`);
+  });
+
+  // Handle offer forwarding
+  socket.on("offer", (data) => {
+    socket.to(data.roomId).emit("offer", data.offer);
+    console.log(`Forwarded offer to room ${data.roomId}:`);
+    console.dir(data.offer);
+  });
+
+  // Handle answer forwarding
+  socket.on("answer", (data) => {
+    socket.to(data.roomId).emit("answer", data.answer);
+    console.log(`Forwarded answer to room ${data.roomId}: ${data.answer}`);
+    console.dir(data.answer);
+  });
+
+  // Handle ICE candidate forwarding
+  socket.on("ice-candidate", (data) => {
+    socket.to(data.roomId).emit("ice-candidate", data);
+    console.log(
+      `Forwarded ICE candidate to room ${data.roomId}: ${data.candidate}`
+    );
+    console.dir(data.candidate);
+  });
+
+  socket.on("start-preview", () => {
+    io.emit("preview_enable");
+  });
 });
 
 io.on("error", (err) => {

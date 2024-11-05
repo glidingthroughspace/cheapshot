@@ -17,6 +17,12 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  mediaDevices,
+  RTCIceCandidate,
+  RTCPeerConnection,
+  RTCSessionDescription,
+} from "react-native-webrtc";
 import { io, Socket } from "socket.io-client";
 
 const CameraScreen: React.FC = () => {
@@ -38,6 +44,129 @@ const CameraScreen: React.FC = () => {
     })();
   }, []);
 
+  const startStreaming = async (roomId: string) => {
+    // Join the room
+    socket.current?.emit("join-room", roomId);
+
+    try {
+      // Get user media stream
+      const stream = await mediaDevices.getUserMedia({
+        video: {
+          facingMode: "environment",
+          width: 1008,
+          height: 1344,
+        },
+        audio: false,
+      });
+
+      const peerConnection = new RTCPeerConnection({
+        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+      });
+
+      const iceCandidatesQueue = [];
+      let hasRemoteDescription = false;
+
+      // Add tracks to the connection
+      stream.getTracks().forEach((track) => {
+        peerConnection.addTrack(track, stream);
+      });
+
+      // Handle ICE candidates
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          console.log("Sending ICE candidate");
+          socket.current?.emit("ice-candidate", {
+            candidate: event.candidate,
+            roomId,
+          });
+        }
+      };
+
+      // Connection state monitoring
+      peerConnection.onconnectionstatechange = () => {
+        console.log("Connection state:", peerConnection.connectionState);
+      };
+
+      // ICE connection state monitoring
+      peerConnection.oniceconnectionstatechange = () => {
+        console.log("ICE connection state:", peerConnection.iceConnectionState);
+      };
+
+      // Create and send offer
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      console.log("Sending offer");
+      socket.current?.emit("offer", {
+        offer: {
+          type: offer.type,
+          sdp: offer.sdp,
+        },
+        roomId,
+      });
+
+      // Handle answer from web client
+      socket.current?.on("answer", async (data) => {
+        try {
+          console.log("Received answer:", data);
+          if (!data || !data.sdp || !data.type) {
+            throw new Error("Invalid answer format received");
+          }
+
+          await peerConnection.setRemoteDescription(
+            new RTCSessionDescription({
+              type: "answer",
+              sdp: data.sdp,
+            })
+          );
+
+          hasRemoteDescription = true;
+
+          // Process queued candidates
+          while (iceCandidatesQueue.length > 0) {
+            const candidate = iceCandidatesQueue.shift();
+            try {
+              await peerConnection.addIceCandidate(
+                new RTCIceCandidate(candidate)
+              );
+            } catch (err) {
+              console.error("Error adding queued candidate:", err);
+            }
+          }
+        } catch (err) {
+          console.error("Error setting remote description:", err);
+        }
+      });
+
+      // Handle incoming ICE candidates
+      socket.current?.on("ice-candidate", async (data) => {
+        if (!hasRemoteDescription) {
+          iceCandidatesQueue.push(data.candidate);
+        } else {
+          try {
+            await peerConnection.addIceCandidate(
+              new RTCIceCandidate(data.candidate)
+            );
+          } catch (err) {
+            console.error("Error adding ICE candidate:", err);
+          }
+        }
+      });
+
+      return {
+        stream,
+        peerConnection,
+        socket,
+        cleanup: () => {
+          stream.getTracks().forEach((track) => track.stop());
+          peerConnection.close();
+        },
+      };
+    } catch (err) {
+      console.error("Error starting stream:", err);
+      throw err;
+    }
+  };
+
   const connectToServer = (): void => {
     setConnectionStatus("connecting");
     setLastServerHost(serverIp);
@@ -54,6 +183,12 @@ const CameraScreen: React.FC = () => {
     socket.current.on("error", (error) => {
       console.log(error);
     });
+    socket.current.on("preview_enable", () => {
+      console.log("Enabling preview");
+      camera.current?.pausePreview();
+      startStreaming("preview");
+    });
+
     socket.current.on(
       "capture-now",
       async ({ captureId }: { captureId: string }) => {
