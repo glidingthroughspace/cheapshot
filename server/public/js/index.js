@@ -2,7 +2,7 @@ import { createApiClient } from "./lib/api.js";
 import { createLocalLogger } from "./lib/log.js";
 const log = createLocalLogger(
   "MGMNT",
-  document.querySelector(".logs-container")
+  document.querySelector(".logs-container"),
 );
 const api = createApiClient(({ level, message }) => log(level, message));
 const deviceContainer = document.getElementById("device-container");
@@ -19,7 +19,7 @@ Sortable.create(deviceContainer, {
   onEnd: function (evt) {
     console.log(`Moved device from index ${evt.oldIndex} to ${evt.newIndex}`);
     const devices = Array.from(deviceContainer.children).map(
-      (deviceElement) => deviceElement.id
+      (deviceElement) => deviceElement.id,
     );
     console.log("New devices: ", devices);
     api("/management/set-device-order", "POST", { devices });
@@ -66,6 +66,9 @@ socket.on("new-server-state", (state) => {
       api("/management/set-preview-device", "POST", { deviceId: device.id });
     });
   });
+
+  document.querySelector("#captureDeviceCount").innerText =
+    `(${state.captureDevices.length})`;
 
   updateMainActionButton(state.currentStatus);
 });

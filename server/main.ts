@@ -1,4 +1,3 @@
-import ejs from "ejs";
 import express from "express";
 import multer from "multer";
 import dns from "node:dns/promises";
@@ -101,11 +100,11 @@ function connectCaptureDevice(device: CaptureDevice) {
     currentStatus !== "waiting_for_controller"
   )
     throw new Error(
-      `Cannot connect capture device in state '${currentStatus}'`
+      `Cannot connect capture device in state '${currentStatus}'`,
     );
   if (!device.id) {
     throw new Error(
-      `Capture device with socket ID ${device.socketId} didn't announce an ID`
+      `Capture device with socket ID ${device.socketId} didn't announce an ID`,
     );
   }
   const existingDevice = captureDevices.find((d) => d.id === device.id);
@@ -186,23 +185,15 @@ const upload = multer({
 // Serve static files from the "public" directory
 app.use(express.static(path.join("public")));
 
-// Set the "views" directory for ESM templates
-app.set("views", path.join("views"));
-app.engine("html", ejs.renderFile);
-app.set("view engine", "html");
+express.static("views");
 
 // Define a route to render a template
 app.get("/", (req, res) => {
-  res.render("index", {
-    captureDevices,
-    captureControllers,
-    serverStatusText: serverStatusMessages[currentStatus],
-    currentStatus,
-  });
+  res.sendFile("views/index.html", { root: "." });
 });
 
 app.get("/capture", (req, res) => {
-  res.render("capture", {});
+  res.sendFile("views/capture.html", { root: "." });
 });
 
 app.post("/api/v1/management/set-device-order", express.json(), (req, res) => {
@@ -253,7 +244,7 @@ app.post("/api/v1/capture", express.json(), async (req, res) => {
     captureDevices
       .filter((dev) => dev.socketId !== undefined)
       .map((dev) => dev.id)
-      .filter((id) => id !== undefined)
+      .filter((id) => id !== undefined),
   );
   log("info", `New capture started: ${id}`);
   io.to("capture-device").emit("capture-now", { id });
@@ -268,7 +259,7 @@ app.put(
     const deviceId = req.params.deviceId;
     log(
       "info",
-      `Received photo for capture ${captureId} from device ${deviceId}`
+      `Received photo for capture ${captureId} from device ${deviceId}`,
     );
 
     try {
@@ -301,7 +292,7 @@ app.put(
     } catch (err) {
       fault(err);
     }
-  }
+  },
 );
 
 app.post(
@@ -310,7 +301,7 @@ app.post(
   (req, res) => {
     connectCaptureController(req.body.id);
     res.json({ success: true });
-  }
+  },
 );
 
 app.post("/api/v1/debug/generate-dummy-devices", express.json(), (req, res) => {
@@ -342,7 +333,7 @@ app.post(
       throw new Error(`Device with id ${deviceId} doesn't exist`);
     }
     sendManagementUpdate();
-  }
+  },
 );
 
 // Socket.IO connection handler
@@ -350,6 +341,7 @@ io.on("connection", (socket) => {
   if (socket.handshake.headers["role"] === "management") {
     socket.join("management");
     log("info", "Managment device connected");
+    sendManagementUpdate();
   } else if (socket.handshake.headers["role"] === "capture-controller") {
     socket.join("capture-controller");
     connectCaptureController(socket.id);
@@ -398,7 +390,7 @@ io.on("connection", (socket) => {
   socket.on("ice-candidate", (data) => {
     socket.to(data.roomId).emit("ice-candidate", data);
     console.log(
-      `Forwarded ICE candidate to room ${data.roomId}: ${data.candidate}`
+      `Forwarded ICE candidate to room ${data.roomId}: ${data.candidate}`,
     );
     console.dir(data.candidate);
   });

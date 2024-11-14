@@ -1,118 +1,129 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Cheapshot</title>
-    <script src="/js/lib/ext/sortable-1.15.0.min.js"></script>
-    <script src="/socket.io/socket.io.js"></script>
-    <!-- Link to the CSS file -->
-    <link rel="stylesheet" href="/styles.css" />
-    <link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48" href="favicon.ico">
-<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-    <link rel="icon" href="/favicon/favicon-192x192.png" sizes="192x192" />
-    <style>
-      .device-container {
-        display: flex;
-        flex-direction: row;
-        gap: 16px;
-        overflow-x: auto;
-        height: clamp(150px, 20svh, 300px);
-      }
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Cheapshot</title>
+        <script src="/js/lib/ext/sortable-1.15.0.min.js"></script>
+        <script src="/socket.io/socket.io.js"></script>
+        <link rel="stylesheet" href="/styles.css" />
+        <link
+            rel="icon"
+            type="image/x-icon"
+            sizes="16x16 32x32 48x48"
+            href="favicon.ico"
+        />
+        <link
+            rel="apple-touch-icon"
+            sizes="180x180"
+            href="/apple-touch-icon.png"
+        />
+        <link
+            rel="icon"
+            type="image/png"
+            sizes="32x32"
+            href="/favicon-32x32.png"
+        />
+        <link
+            rel="icon"
+            type="image/png"
+            sizes="16x16"
+            href="/favicon-16x16.png"
+        />
+        <link rel="icon" href="/favicon/favicon-192x192.png" sizes="192x192" />
+        <style>
+            .device-container {
+                display: flex;
+                flex-direction: row;
+                gap: 16px;
+                overflow-x: auto;
+                height: clamp(150px, 20svh, 300px);
+            }
 
-      .device {
-        position: relative;
-        aspect-ratio: 9/16;
-        min-width: fit-content;
-        border: 2px solid #44403C;
-        border-radius: 5px;
-        font-size: 18px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        border-radius: 8px;
-        cursor: grab;
-        -webkit-user-select: none;
-        user-select: none;
-        padding: 0 8px;
-        box-sizing: border-box;
-        font-family: monospace;
-        height: 100%;
-      }
+            .device {
+                position: relative;
+                aspect-ratio: 9/16;
+                min-width: fit-content;
+                border: 2px solid #44403c;
+                border-radius: 5px;
+                font-size: 18px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                border-radius: 8px;
+                cursor: grab;
+                -webkit-user-select: none;
+                user-select: none;
+                padding: 0 8px;
+                box-sizing: border-box;
+                font-family: monospace;
+                height: 100%;
+            }
 
-      .device:active {
-        cursor: grabbing;
-      }
+            .device:active {
+                cursor: grabbing;
+            }
 
-      .device .camera {
-        width: 25%;
-        position: absolute;
-        top: 8px;
-        left: 8px;
-        border-radius: 999px;
-        background: #44403c;
-        aspect-ratio: 1/1;
-        appearance: none;
-        cursor: pointer;
-      }
+            .device .camera {
+                width: 25%;
+                position: absolute;
+                top: 8px;
+                left: 8px;
+                border-radius: 999px;
+                background: #44403c;
+                aspect-ratio: 1/1;
+                appearance: none;
+                cursor: pointer;
+            }
 
-      .device .camera.isPreviewDevice {
-        border: 2px solid #dc2626;
-      }
+            .device .camera.isPreviewDevice {
+                border: 2px solid #dc2626;
+            }
 
-      .sortable-ghost {
-        opacity: 0.4;
-      }
+            .sortable-ghost {
+                opacity: 0.4;
+            }
 
-      .logs-container {
-        font-family: monospace;
-        overflow-x: auto;
-        max-width: 100%;
-      }
+            .logs-container {
+                font-family: monospace;
+                overflow-x: auto;
+                max-width: 100%;
+            }
 
-      .log.warn {
-        color: #ea580c;
-      }
+            .log.warn {
+                color: #ea580c;
+            }
 
-      .log.info {
-        color: #059669;
-      }
+            .log.info {
+                color: #059669;
+            }
 
-      .log.error {
-        color: #dc2626;
-      }
+            .log.error {
+                color: #dc2626;
+            }
 
-      .log.debug {
-        color: #78716c;
-      }
-    </style>
-  </head>
-  <body>
-    <header>
-    <h1>Cheapshot</h1>
-    <span id="server-status-text"><%= serverStatusText %></span>
-    <button id="main-action-button" class="primary" <%= (currentStatus != "ready") ? "disabled" : "" %>>Start Capture Mode</button>
-    </header>
-    <section>
-    <h2>Capture Devices (<%= captureDevices.length %>)</h2>
-    <div id="device-container" class="device-container container">
-      <% captureDevices.forEach(function(device) { %>
-        <div class="device" id="<%= device.id %>">
-          <button class="camera <%= (device.isPreviewDevice) ? 'isPreviewDevice' : '' %>"></button>
-          <div class="device-id"><%= device.id %></div>
-        </div>
-      <% }); %>
-    </div>
-    </section>
-    <section>
-      <h2>Logs</h2>
-      <div class="logs-container container">
-      </div>
-    </section>
-    <script src="/js/index.js" type="module">
-    </script>
-  </body>
+            .log.debug {
+                color: #78716c;
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <h1>Cheapshot</h1>
+            <span id="server-status-text">Loading...</span>
+            <button id="main-action-button" class="primary disabled">
+                Start Capture Mode
+            </button>
+        </header>
+        <section>
+            <h2>Capture Devices <span id="captureDeviceCount">(...)</span></h2>
+            <div id="device-container" class="device-container container"></div>
+        </section>
+        <section>
+            <h2>Logs</h2>
+            <div class="logs-container container"></div>
+        </section>
+        <script src="/js/index.js" type="module"></script>
+    </body>
 </html>
