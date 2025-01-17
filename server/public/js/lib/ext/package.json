@@ -1,0 +1,19 @@
+{
+  "name": "deps",
+  "module": "index.js",
+  "type": "module",
+  "scripts": {
+    "build": "bun build -o ./preact-htm-standalone.js index.js"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "microbundle": "^0.15.1"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@preact/signals": "^1.3.0",
+    "htm": "^3.1.1"
+  }
+}

@@ -133,9 +133,9 @@ function sendManagementUpdate() {
   });
 }
 
-function fault(err: any) {
+function fault(err: unknown) {
   currentStatus = "faulty";
-  if ("message" in err) {
+  if (typeof err === "object" && err && "message" in err) {
     log("error", `Server fault: ${err.message}`);
   } else {
     log("error", `Unknown server fault: ${err}`);
